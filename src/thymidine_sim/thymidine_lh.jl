@@ -13,6 +13,7 @@ function thymidine_ssm_mc_llh(mcr::SSM_MC_run, T::Vector{<:AbstractFloat}, obs::
         end
     end
 
+
     pop_DNPs=[fit(DiscreteNonParametric,popset_labelled[:,p,t]) for p in 1:pops, t in 1:times]
 
     joints=[joint_DNP_sum(pop_DNPs[:,t]) for t in 1:times]

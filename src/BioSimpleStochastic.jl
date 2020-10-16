@@ -16,6 +16,8 @@ module BioSimpleStochastic
     export Thymidine_Ensemble
     include("thymidine_sim/thymidine_lh.jl")
     include("thymidine_sim/thymidine_mc.jl")
+    include("thymidine_sim/thymidine_dev_cell.jl")
+    include("thymidine_sim/thymidine_dev.jl")
 
 
 end # module

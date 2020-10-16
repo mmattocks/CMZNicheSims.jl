@@ -36,7 +36,7 @@ end
 Thymidine_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Integer}}, priors::AbstractVector{<:Distribution}, constants, GMC_settings; sample_posterior::Bool=true) =
 Thymidine_Ensemble(
     path,
-    thymidine_constructor,
+    d_Thymidine_Model,
     assemble_TMs(path, no_models, obs, priors, constants)...,
     [-Inf], #L0 = 0
 	[0], #ie exp(0) = all of the prior is covered
@@ -59,7 +59,7 @@ function assemble_TMs(path::String, no_models::Integer, obs, priors, constants)
 		model_path = string(path,'/',model_no)
         if !isfile(model_path)
             θvec=sample_θvec(priors)
-			model = Thymidine_Model(model_no, 0, θvec, 0., obs, constants...; v_init=true)
+			model = d_Thymidine_Model(model_no, 0, θvec, 0., obs, constants...; v_init=true)
 			serialize(model_path, model) #save the model to the ensemble directory
 			push!(ensemble_records, Thymidine_Record(model_path,model.log_Li))
 		else #interrupted assembly pick up from where we left off
@@ -86,7 +86,7 @@ function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=f
     T=e.constants[1]
 
     catobs=vcat(e.obs...)
-    ymax=max(maximum(m.disp_mat),minimum(catobs))
+    ymax=max(maximum(m.disp_mat),maximum(catobs))
     ymin=min(minimum(m.disp_mat),minimum(catobs))
 
     plt=lineplot(T,m.disp_mat[:,2],title="Thymidine_Model $(m.id), log_Li $(m.log_Li)",color=:green,name="μ count", ylim=[ymin,ymax])
@@ -100,5 +100,5 @@ function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=f
     println()
     println("Origin: $(m.origin)")
 
-    progress && return nrows(plt.graphics)+7;
+    (progress && return nrows(plt.graphics)+7);
 end
