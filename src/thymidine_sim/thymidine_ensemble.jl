@@ -52,14 +52,18 @@ Thymidine_Ensemble(
     GMC_settings...,
 	no_models+1)
 
-function assemble_TMs(path::String, no_models::Integer, obs, priors, constants)
+function assemble_TMs(path::String, no_trajectories::Integer, obs, priors, constants)
 	ensemble_records = Vector{Thymidine_Record}()
 	!isdir(path) && mkpath(path)
-    @showprogress 1 "Assembling Thymidine_Model ensemble..." for model_no in 1:no_models
-		model_path = string(path,'/',model_no)
+    @showprogress 1 "Assembling Thymidine_Model ensemble..." for trajectory_no in 1:no_trajectories
+		model_path = string(path,'/',trajectory_no,'.',1)
         if !isfile(model_path)
             θvec=sample_θvec(priors)
-			model = d_Thymidine_Model(model_no, 0, θvec, 0., obs, constants...; v_init=true)
+            model = d_Thymidine_Model(trajectory_no, 1, θvec, 0., obs, constants...; v_init=true)
+            while model.log_Li == -Inf
+                θvec=sample_θvec(priors)
+                model = d_Thymidine_Model(trajectory_no, 1, θvec, 0., obs, constants...; v_init=true)
+            end
 			serialize(model_path, model) #save the model to the ensemble directory
 			push!(ensemble_records, Thymidine_Record(model_path,model.log_Li))
 		else #interrupted assembly pick up from where we left off
@@ -89,7 +93,7 @@ function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=f
     ymax=max(maximum(m.disp_mat),maximum(catobs))
     ymin=min(minimum(m.disp_mat),minimum(catobs))
 
-    plt=lineplot(T,m.disp_mat[:,2],title="Thymidine_Model $(m.id), log_Li $(m.log_Li)",color=:green,name="μ count", ylim=[ymin,ymax])
+    plt=lineplot(T,m.disp_mat[:,2],title="Thymidine_Model $(m.trajectory).$(m.i), log_Li $(m.log_Li)",color=:green,name="μ count", ylim=[ymin,ymax])
     lineplot!(plt,T,m.disp_mat[:,1],color=:magenta,name="95% CI")
     lineplot!(plt,T,m.disp_mat[:,3],color=:magenta)
 
@@ -98,7 +102,7 @@ function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=f
 
     show(io, plt)
     println()
-    println("Origin: $(m.origin)")
+    println("θ: $(m.θ)")
 
     (progress && return nrows(plt.graphics)+7);
 end

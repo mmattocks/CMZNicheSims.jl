@@ -1,15 +1,15 @@
-function d_Thymidine_Model(id, origin, θ, v, obs, T, pulse, mc_its, end_time, retain_run; v_init=false)
-    mod(length(θ),6)!=0 && throw(ArgumentError("θ must contain 6 values per lineage population!"))
+function d_Thymidine_Model(trajectory, i, θ, v, obs, T, pulse, mc_its, end_time, retain_run; v_init=false)
+    mod(length(θ),8)!=0 && throw(ArgumentError("θ must contain 8 values per lineage population!"))
     pulse<0 && throw(ArgumentError("pulse length must be >=0!"))
     bound_θ!(θ)
 
-    n_pops=length(θ)/6
-    pparams=Vector{Tuple{Normal, Normal, Float64, Float64}}()
+    n_pops=length(θ)/8
+    pparams=Vector{Tuple{LogNormal, LogNormal, Float64, Normal, Float64}}()
     for pop in 1:n_pops
-        pμ, pσ², r, tcμ, tcσ², s = θ[Int64(1+((pop-1)*6)):Int64(6*pop)]
-        pσ=sqrt(pσ²); tcσ=sqrt(tcσ²)
+        pμ, pσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]
+        pσ=sqrt(pσ²); tcσ=sqrt(tcσ²); sσ=sqrt(sσ²)
 
-        push!(pparams,(Normal(pμ,pσ),Normal(tcμ,tcσ),r,s))
+        push!(pparams,(LogNormal(pμ,pσ),LogNormal(tcμ,tcσ),r,Normal(sμ,sσ),sis_frac))
     end
 
     fate_dist=Categorical([1.,0.,0.])
@@ -20,7 +20,7 @@ function d_Thymidine_Model(id, origin, θ, v, obs, T, pulse, mc_its, end_time, r
 
     v_init && (v=rand(MvNormal(length(θ),1.)))
 
-    Thymidine_Model(id, origin, θ, v, log_lh, fate_dist, retain_run, smr, disp_mat)
+    Thymidine_Model(trajectory, i, θ, v, log_lh, fate_dist, retain_run, smr, disp_mat)
 end
 
 function d_thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Integer}})
@@ -29,12 +29,16 @@ function d_thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:Ab
     
     Threads.@threads for it in 1:mc_its
         for p in 1:n_pops
-            pop_dist,tc_dist,r,s = pparams[p]
+            pop_dist,tc_dist,r,s,sis_frac = pparams[p]
             n_lineages=Int64(max(1,round(rand(pop_dist))))
+            plv=view(popset_labelled,it,p,:)
 
-            for l in 1:n_lineages
-                plv=view(popset_labelled,it,p,:)
-                d_sim_lineage!(plv, T, end_time, pulse, tc_dist,r,s)
+            for l in 1:Int64(floor(n_lineages/2))
+                d_sim_lin_pair!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
+            end
+
+            for l in 1:n_lineages%2
+                d_sim_lineage!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
             end
         end
     end
@@ -65,30 +69,48 @@ function d_thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:Ab
     return log_lh, disp_mat
 end
 
-function d_sim_lineage!(plv, T, end_time, pulse, Tc, r, s)
+function d_sim_lin_pair!(plv, T, end_time, pulse, Tc, r, s, sis_frac)
+    tδ1, s1 = d_refractory_cycle_model(r, Tc, s)
+    tδ2, s2 = (1+rand([-1,1])*sis_frac).*(tδ1, s1)
+
+    birth_time=rand(Uniform(-min(tδ1,tδ2),0.))
+
+    
+    cells1=[LabelCell(birth_time,tδ1,s1,0.)]
+    cells2=[LabelCell(birth_time,tδ2,s2,0.)]
+
+    for cellvec in [cells1,cells2]
+        ci=1
+        while ci<=length(cellvec)
+            cycle_sim!(plv, ci, cellvec, T, end_time, pulse, Tc,r,s, sis_frac)
+            ci+=1
+        end
+    end    
+end
+
+
+function d_sim_lineage!(plv, T, end_time, pulse, Tc, r, s, sis_frac)
     tδ1, s1 = d_refractory_cycle_model(r, Tc, s)
     birth_time=rand(Uniform(-tδ1,0.))
-    cells=[LabelCell(birth_time,0.)]
-    cycle_sim!(plv, 1, cells, T, end_time, pulse, Tc, r, s, tδ1, s1)
-    
-    ci=2
+    cells=[LabelCell(birth_time,tδ1,s1,0.)]
+
+    ci=1
     while ci<= length(cells)
-        cycle_sim!(plv, ci, cells, T, end_time, pulse, Tc, r, s,nothing,nothing)
+        cycle_sim!(plv, ci, cells, T, end_time, pulse, Tc, r, s, sis_frac)
         ci+=1
     end
 end
 
-function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}, end_time::Float64, pulse::Float64, Tc::Normal, r::Float64, sf::Float64, tδ1, s1)
+function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}, end_time::Float64, pulse::Float64, Tc::LogNormal, r::Float64, sd::Normal, sis_frac::Float64)
     n_times=length(T);
 
     cell=cells[ci]
-    t=cell.time;l=cell.label
+    t=cell.time; tδ′=cell.tδ′; s′=cell.s′; l=cell.label
 
-    first_cycle=false
-    tδ1!==nothing && s1!==nothing && (first_cycle=true)
+    first_cycle=true
     while t<end_time
         tδ,s=0.,0.
-        first_cycle ? (tδ=tδ1;s=s1;first_cycle=false) : ((tδ, s)=d_refractory_cycle_model(r, Tc, sf))
+        first_cycle ? (tδ=tδ′;s=s′;first_cycle=false) : ((tδ, s)=d_refractory_cycle_model(r, Tc, sd))
 
         s_start=t+r
         s_end=s_start+s
@@ -98,7 +120,7 @@ function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}
         oldl=l; cycle_label=false
         if (s_start <= pulse && s_end >= 0) #some s-phase overlaps with the pulse in this case
             cycle_label=true
-            l=update_label(l, s_start, s, pulse)
+            l=update_label(l, s, s_start, s_end, pulse)
         end
 
         tidxs=t.<T.<cycle_mitosis
@@ -109,36 +131,42 @@ function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}
             cycle_label ? (label_outcomes=[oldl,-Inf,l]) : (label_outcomes=[oldl,oldl,oldl])
             cubuf=falses(n_idxs)
             for (n,timept) in enumerate(T[tidxs])
-                outcome_idx=timept.<cycle_events
-                timept_label=label_outcomes[outcome_idx][1]
-                timept_label==-Inf && (timept_label=partial_label(timept,oldl,s_start,s,pulse))
-                timept_label >= DETECTION_THRESHOLD && (cubuf[n]=true)
+                count_labelled_at_T!(n,cubuf,timept, cycle_events, label_outcomes, oldl, s_start, s, pulse)
             end
             plv[tidxs]+=cubuf
         end
 
         l/=2 #mitosis halves label for the daughters
 
-        cycle_mitosis < end_time && push!(cells,LabelCell(cycle_mitosis,l))
+        tδ2, s2 = (1+rand([-1,1])*sis_frac).*(tδ, s)
+
+        cycle_mitosis < end_time && push!(cells,LabelCell(cycle_mitosis,tδ2,s2,l))
         t+=tδ
     end
 end
 
-function d_refractory_cycle_model(refractory, Tc, s_frac)
-    Tc=max(0,rand(Tc))
-    tδ=refractory + Tc
-    s=tδ*s_frac
+function d_refractory_cycle_model(refractory, Tc, s_dist)
+    cycle_time=rand(Tc)
+    s=max(eps(),rand(s_dist))
+    tδ=max(refractory + s, cycle_time)
     return tδ, s
 end
 
-function update_label(label, s_start, s, pulse)
-        s_overlap=min(pulse,s_start+s)-max(0,s_start)
+function update_label(label, s, s_start, s_end, pulse)
+        s_overlap=min(pulse,s_start+s_end)-max(0,s_start)
         nuc_label_frac=s_overlap/s
         return min(nuc_label_frac+label,1.) #label before mitosis time will be what's been accumulated from past + this cycle's s phase
 end
 
+function count_labelled_at_T!(n, cubuf, timept, cycle_events, label_outcomes, oldl, s_start, s, pulse)
+    outcome_idx=timept.<cycle_events
+    timept_label=label_outcomes[outcome_idx][1]
+    timept_label==-Inf && (timept_label=partial_label(timept,oldl,s_start,s,pulse))
+    timept_label >= DETECTION_THRESHOLD && (cubuf[n]=true)
+end
+
 function partial_label(timept, label, s_start, s, pulse)
-        s_overlap=min(pulse,timept)-max(0.,s_start)
-        nuc_label_frac=s_overlap/s
-        return min(nuc_label_frac+label,1.)
+    s_overlap=min(pulse,timept)-max(0.,s_start)
+    nuc_label_frac=s_overlap/s
+    return min(nuc_label_frac+label,1.)
 end

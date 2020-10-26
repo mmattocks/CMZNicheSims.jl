@@ -4,8 +4,8 @@ struct Thymidine_Record <: GMC_NS_Model_Record
 end
 
 mutable struct Thymidine_Model <: GMC_NS_Model
-    id::Int64
-    origin::Int64
+    trajectory::Int64
+    i::Int64
 
     θ::Vector{Float64}
     v::Vector{Float64}
@@ -18,7 +18,7 @@ mutable struct Thymidine_Model <: GMC_NS_Model
     disp_mat::Matrix{Float64} #matrix for mean & 95%CI plot of model output
 end
 
-function Thymidine_Model(id, origin, θ, v, obs, T, pulse, mc_its, end_time, retain_run; v_init=false)
+function Thymidine_Model(trajectory, i, θ, v, obs, T, pulse, mc_its, end_time, retain_run; v_init=false)
     mod(length(θ),6)!=0 && throw(ArgumentError("θ must contain 6 values per lineage population!"))
     pulse<0 && throw(ArgumentError("pulse length must be >=0!"))
     bound_θ!(θ)
@@ -46,16 +46,13 @@ function Thymidine_Model(id, origin, θ, v, obs, T, pulse, mc_its, end_time, ret
 
     v_init && (v=rand(MvNormal(length(θ),1.)))
 
-    Thymidine_Model(id, origin, θ, v, log_lh, fate_dist, retain_run, smr, disp_mat)
+    Thymidine_Model(trajectory, i, θ, v, log_lh, fate_dist, retain_run, smr, disp_mat)
 end
-
                 function bound_θ!(θ)
-                    npops=length(θ)/6
+                    npops=length(θ)/8
                     θ[findall(θi->θi<0., θ)].=nextfloat(0.)
                     for p in 1:npops
-                        θ[Int64(3*p)]<1. && (θ[Int64(3*p)]=1.)
-                        θ[Int64(4*p)]<1. && (θ[Int64(4*p)]=1.)
-                        θ[Int64(6*p)]>1. && (θ[Int64(6*p)]=1.)
+                        θ[Int64(8*p)]>1. && (θ[Int64(6*p)]=1.)
                     end
                     return θ
                 end
