@@ -18,11 +18,10 @@ mutable struct CMZ_Model <: GMC_NS_Model
 
     disp_mat::Array{Float64} #matrix for mean & 95%CI plot of model output
 
-    function CMZ_Model(trajectory, i, θ, pos, v, obs, box, T, popdist, voldist, noise_dist, mc_its, phs; v_init=false)
-        bind_phases!(θ,phs)
-        pparams=θ[1:2*phs];phase_ends=θ[2*phs+1:(2*phs+1)+(phs-2)];volconst=θ[end]
+    function CMZ_Model(trajectory::Int64, i::Int64, θ::Vector{Float64}, pos::Vector{Float64}, v::Vector{Float64}, obs::Vector{Tuple{Vector{Float64},Vector{Float64}}}, T::Vector{Float64}, popdist::Distribution, voldist::Distribution, volconst::Float64, mc_its::Int64, phs::Int64; v_init=false)
+        pparams=θ[1:2*phs];phase_ends=θ[2*phs+1:(2*phs+1)+(phs-2)]
 
-        log_lh,disp_mat=CMZ_mc_llh(popdist, voldist, volconst, phase_ends, pparams, noise_dist, mc_its, T, obs)
+        log_lh,disp_mat=CMZ_mc_llh(popdist, voldist, volconst, phase_ends, pparams, mc_its, T, obs)
     
         v_init && (v=rand(MvNormal(length(θ),1.)))
 
@@ -31,12 +30,3 @@ mutable struct CMZ_Model <: GMC_NS_Model
 end
 
 construct_CMZ(args...;kwargs...) = CMZ_Model(args...;kwargs...)
-
-function bind_phases!(θ,phs)
-    if phs>2
-        phase_ends=θ[2*phs+1:(2*phs+1)+(phs-2)]
-        for pe in 1:phs-2
-            phase_ends[pe]>phase_ends[pe+1]&& (phase_ends[pe+1]=phase_ends[pe]+1)
-        end
-    end
-end

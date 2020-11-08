@@ -1,54 +1,53 @@
 const MAXVAL=prevfloat(Inf)
 
-function CMZ_mc_llh(popdist, voldist, volconst, phase_ends, pparams, noise_dist, mc_its, T::Vector{<:AbstractFloat}, obs::Vector{<:Tuple{<:AbstractVector{<:Float64},<:AbstractVector{<:Float64}}})
+function CMZ_mc_llh(popdist::Distribution, voldist::Distribution, volconst::Float64, phase_ends::Vector{Float64}, pparams::Vector{Float64}, mc_its::Int64, T::Vector{<:AbstractFloat}, obs::Vector{<:Tuple{<:AbstractVector{<:Float64},<:AbstractVector{<:Float64}}})
     times=length(T)
-    results=zeros(mc_its,times,2)
     pends=floor.(phase_ends)
-    events=sort(unique(vcat(T,pends)))
+    events=Int64.(sort(unique(vcat(T,pends))))
+    results=zeros(mc_its,length(events),2)
 
-    Threads.@threads for it in 1:mc_its
+    nt=Threads.nthreads()
+    Threads.@threads for t in 1:nt
+        t==nt ? (idxs=1+(t-1)*Int(floor(mc_its/nt)):mc_its) : (idxs=(1+(t-1)*Int(floor(mc_its/nt))):t*Int(floor(mc_its/nt)))
+     
         phase=1
         cycle_time,exit_rate=pparams[1+((phase-1)*2):2+((phase-1)*2)]
 
-        pop₀=rand(popdist); vol₀=rand(voldist)
-        popₜ=pop₀;volₜ=vol₀
-        results[it,1,:]=[popₜ,volₜ]
-        
-        t₀=Int64(events[1]); t=t₀; next_event=2; next_tidx=2
+        results[idxs,1,1].=rand.(popdist)
+        results[idxs,1,2].=rand.(voldist)
+
+        last_ph_ch=1;
+        next_event=2;
         while next_event<=length(events)
-            popₜ==0 && (results[it,next_tidx:end,:].=[0. vol];break) 
-            popₜ==MAXVAL && (results[it,next_tidx:end,:].=[MAXVAL volₜ];break)
-            volₜ==MAXVAL && (results[it,next_tidx:end,:].=[popₜ MAXVAL];break)
-          
-            n=Int64(events[next_event])-t₀
+            n=events[next_event]-events[last_ph_ch]
 
-            pop_factor=(2^(24/cycle_time)-exit_rate)
+            pop_factor=max(eps(),(2^(24/cycle_time)-exit_rate))
             pop_factor==1. && (pop_factor=pop_factor+eps())
-            volₜ=vol₀+((volconst*pop₀*exit_rate*(1-pop_factor^(n-1)))/(1-pop_factor))
-            popₜ=pop₀*pop_factor^n
+            vol_factor=volconst*exit_rate*(1-pop_factor^(n-1))/(1-pop_factor)
 
-            volₜ=ifelse(volₜ<MAXVAL, volₜ,MAXVAL)
-            popₜ=ifelse(popₜ>0., ifelse(popₜ<MAXVAL,popₜ,MAXVAL),0.)
+            lastpops=view(results,idxs,last_ph_ch,1)
+            lastvols=view(results,idxs,last_ph_ch,2)
 
-            if t in pends #after updating pop and vol to t, update phase parameters for next event, make t₀ vol₀ and pop₀ the phase change vals
-                phase+=1
+            results[idxs,next_event,1].=max.(min.(lastpops.*pop_factor^n,MAXVAL),eps())
+            results[idxs,next_event,2].=min.(lastvols.+(lastpops.*vol_factor),MAXVAL)
+
+            if events[next_event] in pends #after updating pop and vol to t, update phase parameters for next event, make t₀ vol₀ and pop₀ the phase change vals
+                phase+=1; last_ph_ch=next_event
                 phase <= length(pparams)/2 && ((cycle_time,exit_rate)=pparams[1+((phase-1)*2):2+((phase-1)*2)])
-                phase>length(phase_ends) ? (phase_end=maximum(T)+1) : (phase_end=phase_ends[phase])
-                t₀=t; vol₀=volₜ; pop₀=popₜ
             end #advance phase if necessary
 
-            t in T && (results[it,next_tidx,:]=[popₜ,volₜ]; next_tidx+=1)#write pop,vol
-
-            t=events[next_event];  next_event+=1
+            next_event+=1
         end
     end
+
+    tidxs=[findfirst(t->t==time,events) for time in T]
 
     pop_lns=Vector{LogNormal}(undef,times)
     vol_lns=Vector{LogNormal}(undef,times)
     try
         Threads.@threads for t in 1:times
-                pop_lns[t]=fit(LogNormal,results[:,t,1])
-                vol_lns[t]=fit(LogNormal,results[:,t,2])
+                pop_lns[t]=fit(LogNormal,results[:,tidxs[t],1])
+                vol_lns[t]=fit(LogNormal,results[:,tidxs[t],2])
         end
     catch
         return -Inf, zeros(0,0,0)
@@ -56,11 +55,12 @@ function CMZ_mc_llh(popdist, voldist, volconst, phase_ends, pparams, noise_dist,
 
     pop_lhs=Vector{Float64}(undef,times-1)
     vol_lhs=Vector{Float64}(undef,times-1)
+
     Threads.@threads for t in 1:times-1
         pop_lhs[t]=lps(logpdf(pop_lns[t+1],obs[t+1][1]))
         vol_lhs[t]=lps(logpdf(vol_lns[t+1],obs[t+1][2]))
     end
-
+    
     log_lh=lps(lps(pop_lhs),lps(vol_lhs))
 
     disp_mat=zeros(times,3,2)

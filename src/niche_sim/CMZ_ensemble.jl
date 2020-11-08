@@ -15,11 +15,13 @@ mutable struct CMZ_Ensemble <: GMC_NS_Ensemble
     obs::AbstractVector{<:Tuple{<:AbstractVector{<:Float64},<:AbstractVector{<:Float64}}}
     priors::Vector{<:Distribution}
     constants::Vector{<:Any}
-    #T, popdist, voldist, noise_dist, mc_its, phs
+    #T, popdist, voldist, mc_its, phs
     box::Matrix{Float64}
 
     sample_posterior::Bool
     posterior_samples::Vector{CMZ_Record}
+
+    GMC_Nmin::Int64
 
     GMC_τ_death::Float64
     GMC_init_τ::Float64
@@ -47,14 +49,14 @@ CMZ_Ensemble(
 	[0], #H0 = 0,
     obs,
     priors,
-    constants, #T, popdist, voldist, noise_dist, mc_its, phs
+    constants, #T, popdist, voldist, mc_its, phs
     box,
     sample_posterior,
     Vector{CMZ_Record}(),
     GMC_settings...,
     no_models+1)
 
-function assemble_CMs(path::String, no_trajectories::Integer, obs, priors, constants, box)
+function assemble_CMs(path::String, no_trajectories::Integer, obs, priors, constants, box; cutoff=-1e15)
     ensemble_records = Vector{CMZ_Record}()
     !isdir(path) && mkpath(path)
     phs=constants[6]
@@ -68,7 +70,18 @@ function assemble_CMs(path::String, no_trajectories::Integer, obs, priors, const
             box_bound!(pos,box)
             θvec=to_prior.(pos,priors)
             
-            model = CMZ_Model(trajectory_no, 1, θvec, pos, [0.], obs, box, constants...; v_init=true)
+            model = CMZ_Model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+
+            # while model.log_Li < cutoff
+            #     proposal=rand.(priors)
+            #     proposal[2*phs+1:(2*phs+1)+(phs-2)]=sort(proposal[2*phs+1:(2*phs+1)+(phs-2)])
+    
+            #     pos=to_unit_ball.(proposal,priors)
+            #     box_bound!(pos,box)
+            #     θvec=to_prior.(pos,priors)
+                
+            #     model = CMZ_Model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+            # end
     
             serialize(model_path, model) #save the model to the ensemble directory
             push!(ensemble_records, CMZ_Record(trajectory_no, 1, pos,model_path,model.log_Li))
