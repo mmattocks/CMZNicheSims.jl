@@ -6,7 +6,7 @@ struct CMZ_Record <: GMC_NS_Model_Record
     log_Li::Float64
 end
 
-mutable struct CMZ_Model <: GMC_NS_Model
+struct CMZ_Model <: GMC_NS_Model
     trajectory::Int64
     i::Int64
 
