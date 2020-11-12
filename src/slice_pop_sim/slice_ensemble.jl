@@ -19,7 +19,7 @@ mutable struct Slice_Ensemble <: GMC_NS_Ensemble
     box::Matrix{Float64}
 
     sample_posterior::Bool
-    posterior_samples::Vector{CMZ_Record}
+    posterior_samples::Vector{Slice_Record}
 
     GMC_Nmin::Int64
 
@@ -39,7 +39,7 @@ end
 Slice_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Float64}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
 Slice_Ensemble(
     path,
-    construct_Slice,
+    construct_slice,
     assemble_SMs(path, no_models, obs, priors, constants, box)...,
     [-Inf], #L0 = 0
 	[0], #ie exp(0) = all of the prior is covered
@@ -59,7 +59,7 @@ Slice_Ensemble(
 function assemble_SMs(path::String, no_trajectories::Integer, obs, priors, constants, box)
     ensemble_records = Vector{Slice_Record}()
     !isdir(path) && mkpath(path)
-    phs=constants[6]
+    phs=constants[5]
     @showprogress 1 "Assembling Slice_Model ensemble..." for trajectory_no in 1:no_trajectories
         model_path = string(path,'/',trajectory_no,'.',1)
         if !isfile(model_path)

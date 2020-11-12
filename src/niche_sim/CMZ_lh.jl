@@ -44,8 +44,11 @@ function CMZ_mc_llh(popdist::Distribution, voldist::Distribution, volconst::Floa
 
     pop_lns=Vector{LogNormal}(undef,times)
     vol_lns=Vector{LogNormal}(undef,times)
+    pop_lns[1]=popdist
+    vol_lns[1]=voldist
+
     try
-        Threads.@threads for t in 1:times
+        Threads.@threads for t in 2:times
                 pop_lns[t]=fit(LogNormal,results[:,tidxs[t],1])
                 vol_lns[t]=fit(LogNormal,results[:,tidxs[t],2])
         end

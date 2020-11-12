@@ -1,6 +1,6 @@
 const MAXVAL=prevfloat(Inf)
 
-function slice_mc_llh(popdist::Distribution, lm::Lens_Model, phase_ends::Vector{Float64}, pparams::Vector{Float64}, mc_its::Int64, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Float64}})
+function slice_mc_llh(popdist::Distribution, lm::Lens_Model, phase_ends::Vector{Float64}, pparams::Vector{Float64}, mc_its::Int64, T::Vector{Float64}, obs::Vector{Vector{Float64}})
     times=length(T)
     pends=floor.(phase_ends)
     events=Int64.(sort(unique(vcat(T,pends))))
@@ -24,9 +24,9 @@ function slice_mc_llh(popdist::Distribution, lm::Lens_Model, phase_ends::Vector{
             pop_factor==1. && (pop_factor=pop_factor+eps())
 
             lastpops=view(results,idxs,last_ph_ch)
-            circ_exit=circumferential_exit.(lm,events[last_ph_ch],events[next_event],lastpops)
+            circ_exit=circumferential_exit(lm,events[last_ph_ch],events[next_event],lastpops)
 
-            results[idxs,next_event].=max.(min.(lastpops.*pop_factor^n,MAXVAL),eps()).-circ_exit
+            results[idxs,next_event].=max.(min.(lastpops.*pop_factor^n,MAXVAL).-circ_exit,eps())
 
             if events[next_event] in pends #after updating pop and vol to t, update phase parameters for next event, make t₀ vol₀ and pop₀ the phase change vals
                 phase+=1; last_ph_ch=next_event
@@ -39,10 +39,11 @@ function slice_mc_llh(popdist::Distribution, lm::Lens_Model, phase_ends::Vector{
 
     tidxs=[findfirst(t->t==time,events) for time in T]
 
-    pop_lns=Vector{LogNormal}(undef,times-1)
+    pop_lns=Vector{LogNormal}(undef,times)
+    pop_lns[1]=popdist
     try
-        Threads.@threads for t in 1:times-1
-                pop_lns[t]=fit(LogNormal,results[:,tidxs[t+1]])
+        Threads.@threads for t in 2:times
+                pop_lns[t]=fit(LogNormal,results[:,tidxs[t]])
         end
     catch
         return -Inf, zeros(0,0,0)
@@ -54,8 +55,9 @@ function slice_mc_llh(popdist::Distribution, lm::Lens_Model, phase_ends::Vector{
         pop_lhs[t]=lps(logpdf(pop_lns[t],obs[t+1]))
     end
     
-    log_lh=lps(lps(pop_lhs),lps(vol_lhs))
+    log_lh=lps(pop_lhs)
 
+    disp_mat=zeros(times,3)
     Threads.@threads for t in 1:times
         disp_mat[t,:]=[quantile(pop_lns[t],.025),mean(pop_lns[t]),quantile(pop_lns[t],.975)]
     end
