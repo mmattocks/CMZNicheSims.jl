@@ -6,7 +6,7 @@ end
 
 function circumferential_exit(lm,t1,t2,pop)
     t1c=lm.factor*(t1^lm.power)
-    sliceno=t1c/14
+    sliceno=t1c/lm.section
 
     t2c=lm.factor*(t2^lm.power)
     nc=t2c-t1c

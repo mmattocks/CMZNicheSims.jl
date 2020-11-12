@@ -12,10 +12,10 @@ mutable struct Slice_Ensemble <: GMC_NS_Ensemble
     log_Zi::Vector{Float64}
     Hi::Vector{Float64}
 
-    obs::AbstractVector{{<:AbstractVector{<:Float64}}}
+    obs::AbstractVector{<:AbstractVector{<:Float64}}
     priors::Vector{<:Distribution}
     constants::Vector{<:Any}
-    #T, popdist, voldist, mc_its, phs
+    #T, popdist, lens_model, mc_its, phs
     box::Matrix{Float64}
 
     sample_posterior::Bool
@@ -36,7 +36,7 @@ mutable struct Slice_Ensemble <: GMC_NS_Ensemble
     t_counter::Int64
 end
 
-Slice_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:Tuple{<:AbstractVector{<:Float64},<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
+Slice_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Float64}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
 Slice_Ensemble(
     path,
     construct_Slice,
