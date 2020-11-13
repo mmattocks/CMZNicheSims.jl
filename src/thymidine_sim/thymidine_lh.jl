@@ -1,44 +1,48 @@
-function thymidine_ssm_mc_llh(mcr::SSM_MC_run, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Integer}})
-    times=length(T); its=length(mcr.popsets)
-    pops=length(mcr.popsets[1])
+function thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Integer}})
+    n_pops=length(pparams); times=length(T)
+    popset_labelled=zeros(Int64,mc_its,n_pops,times)
+    
+    Threads.@threads for it in 1:mc_its
+        for p in 1:n_pops
+            pop_dist,tc_dist,r,s,sis_frac = pparams[p]
+            n_lineages=Int64(max(1,round(rand(pop_dist))))
+            plv=view(popset_labelled,it,p,:)
 
-    popset_labelled=zeros(its,pops,times)
-    Threads.@threads for (it,popset) in collect(enumerate(mcr.popsets))
-        for (n,pop) in enumerate(popset)
-            for lineage in pop.lineages
-                for (tn, t) in enumerate(T)
-                    popset_labelled[it,n,tn]+=label_ct_at_time(lineage,t)
-                end
+            for l in 1:Int64(floor(n_lineages/2))
+                sim_lin_pair!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
+            end
+
+            for l in 1:n_lineages%2
+                sim_lineage!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
             end
         end
     end
 
+    pop_DNPs=Matrix{DiscreteNonParametric}(undef,n_pops,times)
+    for p in 1:n_pops
+        Threads.@threads for t in 1:times
+            pop_DNPs[p,t]=fit(DiscreteNonParametric,popset_labelled[:,p,t])
+        end
+    end
 
-    pop_DNPs=[fit(DiscreteNonParametric,popset_labelled[:,p,t]) for p in 1:pops, t in 1:times]
+    joints=Vector{DiscreteNonParametric}(undef,times)    
+    Threads.@threads for t in 1:times
+        joints[t]=joint_DNP_sum(pop_DNPs[:,t])
+    end
 
-    joints=[joint_DNP_sum(pop_DNPs[:,t]) for t in 1:times]
+    log_lhs=Vector{Float64}(undef,times)
+    Threads.@threads for t in 1:times
+        log_lhs[t]=lps(logpdf(joints[t],obs[t]))
+    end
 
-    log_lh=sum(sum.([logpdf(joints[t],obs[t]) for t in 1:times]))
+    log_lh=lps(log_lhs)
 
     disp_mat=zeros(times,3)
     Threads.@threads for t in 1:times
         disp_mat[t,:]=[quantile(joints[t],.025),mean(joints[t]),quantile(joints[t],.975)]
     end
-
     return log_lh, disp_mat
 end
-
-                function label_ct_at_time(l::AbstractLineage,t::AbstractFloat)
-                    ct=0
-                    for c in l.cells
-                        idx=findlast(tm->tm<t,c.events)
-                        if !(isnothing(idx))
-                            c.label[idx] > 0. && (ct+=1)
-                        end
-                    end
-                    return ct
-                end
-
 
 function joint_DNP_sum(cs)
     npops=length(cs)
@@ -60,4 +64,6 @@ function joint_DNP_sum(cs)
 
     return DiscreteNonParametric(possible_totals, exp.(probs))
 end
+
+
     

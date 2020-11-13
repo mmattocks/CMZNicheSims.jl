@@ -1,4 +1,7 @@
 struct Thymidine_Record <: GMC_NS_Model_Record
+    trajectory::Int64
+    i::Int64
+    pos::Vector{Float64}
     path::String
     log_Li::Float64
 end
@@ -8,53 +11,33 @@ mutable struct Thymidine_Model <: GMC_NS_Model
     i::Int64
 
     θ::Vector{Float64}
-    v::Vector{Float64}
     log_Li::Float64
-    fate_dist::Categorical
 
-    retain_run::Bool #determines whether simulated MC run data is serialized or discarded
-    run::SSM_MC_run
+    pos::Vector{Float64}
+    v::Vector{Float64}
 
     disp_mat::Matrix{Float64} #matrix for mean & 95%CI plot of model output
 end
 
-function Thymidine_Model(trajectory, i, θ, v, obs, T, pulse, mc_its, end_time, retain_run; v_init=false)
-    mod(length(θ),6)!=0 && throw(ArgumentError("θ must contain 6 values per lineage population!"))
+function Thymidine_Model(trajectory, i, θ, pos, v, obs, T, pulse, mc_its, end_time; v_init=false)
+    mod(length(θ),8)!=0 && throw(ArgumentError("θ must contain 8 values per lineage population!"))
     pulse<0 && throw(ArgumentError("pulse length must be >=0!"))
     bound_θ!(θ)
 
-    n_pops=length(θ)/6
-
-    (pd, rt, tc, sf) = (Vector{Normal}(),Vector{Float64}(),Vector{Normal}(),Vector{Float64}())
-    pvecs=[pd,rt,tc,sf]
-
+    n_pops=length(θ)/8
+    pparams=Vector{Tuple{LogNormal, LogNormal, Float64, Normal, Float64}}()
     for pop in 1:n_pops
-        pμ, pσ², r, tcμ, tcσ², s = θ[Int64(1+((pop-1)*6)):Int64(6*pop)]
-        pσ=sqrt(pσ²); tcσ=sqrt(tcσ²)
+        pμ, pσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]
+        pσ=sqrt(pσ²); tcσ=sqrt(tcσ²); sσ=sqrt(sσ²)
 
-        push!(pd,Normal(pμ,pσ)); push!(rt,r)
-        push!(tc,Normal(tcμ,tcσ)); push!(sf,s)
+        push!(pparams,(LogNormal(pμ,pσ),LogNormal(tcμ,tcσ),r,Normal(sμ,sσ),sis_frac))
     end
 
-    fate_dist=Categorical([1.,0.,0.])
-
-    smr=init_thymidine_MC_run(pvecs...,mc_its)
-    exec_t_MC_run!(smr, [:refractory, :Tc_μ, :Tc_σ, :s_frac], end_time, pulse, fate_dist)
-    log_lh,disp_mat=thymidine_ssm_mc_llh(smr,T,obs)
-
-    !retain_run && (smr=SSM_MC_run(Vector{Vector{Population}}(),true))
-
+    log_lh,disp_mat=thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T, obs)
+    
     v_init && (v=rand(MvNormal(length(θ),1.)))
 
-    Thymidine_Model(trajectory, i, θ, v, log_lh, fate_dist, retain_run, smr, disp_mat)
+    Thymidine_Model(trajectory, i, θ, log_lh, pos, v, disp_mat)
 end
-                function bound_θ!(θ)
-                    npops=length(θ)/8
-                    θ[findall(θi->θi<0., θ)].=nextfloat(0.)
-                    for p in 1:npops
-                        θ[Int64(8*p)]>1. && (θ[Int64(6*p)]=1.)
-                    end
-                    return θ
-                end
 
 thymidine_constructor(params...) = Thymidine_Model(params...)

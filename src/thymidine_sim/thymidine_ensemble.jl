@@ -16,28 +16,31 @@ mutable struct Thymidine_Ensemble <: GMC_NS_Ensemble
     priors::Vector{<:Distribution}
     constants::Vector{<:Any}
     #T, pulse, mc_its, end_time, retain_run
+    box::Matrix{Float64}
 
     sample_posterior::Bool
     posterior_samples::Vector{Thymidine_Record}
 
-    GMC_tune_ι::Int64
-    GMC_tune_ρ::Float64
+    GMC_Nmin::Int64
+
+    GMC_τ_death::Float64
+    GMC_init_τ::Float64
     GMC_tune_μ::Int64
     GMC_tune_α::Float64
-    GMC_tune_β::Float64
+    GMC_tune_PID::NTuple{3,Float64}
 
     GMC_timestep_η::Float64
     GMC_reflect_η::Float64
     GMC_exhaust_σ::Float64
 
-    model_counter::Int64
+    t_counter::Int64
 end
 
-Thymidine_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Integer}}, priors::AbstractVector{<:Distribution}, constants, GMC_settings; sample_posterior::Bool=true) =
+Thymidine_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Integer}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
 Thymidine_Ensemble(
     path,
-    d_Thymidine_Model,
-    assemble_TMs(path, no_models, obs, priors, constants)...,
+    Thymidine_Model,
+    assemble_TMs(path, no_models, obs, priors, constants, box)...,
     [-Inf], #L0 = 0
 	[0], #ie exp(0) = all of the prior is covered
 	[-Inf], #w0 = 0
@@ -46,45 +49,37 @@ Thymidine_Ensemble(
 	[0], #H0 = 0,
     obs,
     priors,
-    constants, #T, pulse, mc_its, end_time, retain_run
+    constants, #T, pulse, mc_its, end_time
+    box,
     sample_posterior,
     Vector{Thymidine_Record}(),
     GMC_settings...,
 	no_models+1)
 
-function assemble_TMs(path::String, no_trajectories::Integer, obs, priors, constants)
+function assemble_TMs(path::String, no_trajectories::Integer, obs, priors, constants, box)
 	ensemble_records = Vector{Thymidine_Record}()
 	!isdir(path) && mkpath(path)
     @showprogress 1 "Assembling Thymidine_Model ensemble..." for trajectory_no in 1:no_trajectories
 		model_path = string(path,'/',trajectory_no,'.',1)
         if !isfile(model_path)
-            θvec=sample_θvec(priors)
-            model = d_Thymidine_Model(trajectory_no, 1, θvec, 0., obs, constants...; v_init=true)
-            while model.log_Li == -Inf
-                θvec=sample_θvec(priors)
-                model = d_Thymidine_Model(trajectory_no, 1, θvec, 0., obs, constants...; v_init=true)
-            end
+            proposal=rand.(priors)
+
+            pos=to_unit_ball.(proposal,priors)
+            box_bound!(pos,box)
+            θvec=to_prior.(pos,priors)
+
+            model = Thymidine_Model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+
 			serialize(model_path, model) #save the model to the ensemble directory
-			push!(ensemble_records, Thymidine_Record(model_path,model.log_Li))
+			push!(ensemble_records, Thymidine_Record(trajectory_no, 1, pos,model_path,model.log_Li))
 		else #interrupted assembly pick up from where we left off
 			model = deserialize(model_path)
-			push!(ensemble_records, Thymidine_Record(model_path,model.log_Li))
+			push!(ensemble_records, Thymidine_Record(trajectory_no, 1, pos,model_path,model.log_Li))
 		end
 	end
 
 	return ensemble_records, minimum([record.log_Li for record in ensemble_records])
 end
-
-                function sample_θvec(priors)
-                    θvec=zeros(0)
-                    for prior in priors
-                        sample=rand(prior)
-                        for val in sample
-                            push!(θvec,val)
-                        end
-                    end
-                    return θvec
-                end
 
 function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=false)
     T=e.constants[1]
