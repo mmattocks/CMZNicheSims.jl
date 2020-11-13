@@ -87,15 +87,15 @@ end
 function Base.show(io::IO, m::Slice_Model, e::Slice_Ensemble; progress=false)
     T=e.constants[1]
 
-    catpobs=vcat([e.obs[t][1] for t in 1:length(T)]...)
-    ymax=max(maximum(m.disp_mat[:,:,1]),maximum(catpobs))
-    ymin=min(minimum(m.disp_mat[:,:,1]),minimum(catpobs))
+    catpobs=vcat([e.obs[t] for t in 1:length(T)]...)
+    ymax=max(maximum(m.disp_mat[:,:]),maximum(catpobs))
+    ymin=min(minimum(m.disp_mat[:,:]),minimum(catpobs))
 
     plt=lineplot(T,m.disp_mat[:,2],title="Slice_Model $(m.trajectory).$(m.i), log_Li $(m.log_Li)",color=:green,name="μ pop", ylim=[ymin,ymax])
     lineplot!(plt,T,m.disp_mat[:,1],color=:magenta,name="95% CI")
     lineplot!(plt,T,m.disp_mat[:,3],color=:magenta)
 
-    Ts=vcat([[T[n] for i in 1:length(e.obs[n][1])] for n in 1:length(T)]...)
+    Ts=vcat([[T[n] for i in 1:length(e.obs[n])] for n in 1:length(T)]...)
     scatterplot!(plt,Ts, catpobs, color=:yellow, name="Obs")
 
     show(io, plt)
