@@ -11,9 +11,9 @@ module BioSimpleStochastic
     export Thymidine_Ensemble
     include("thymidine_sim/thymidine_sim.jl")
     include("thymidine_sim/thymidine_lh.jl")
-    include("niche_sim/CMZ_lh.jl")
-    include("niche_sim/CMZ_model.jl")
-    include("niche_sim/CMZ_ensemble.jl")
+    include("CMZ_sim/CMZ_lh.jl")
+    include("CMZ_sim/CMZ_model.jl")
+    include("CMZ_sim/CMZ_ensemble.jl")
     export CMZ_Ensemble
     include("slice_pop_sim/lens_model.jl")
     export Lens_Model
