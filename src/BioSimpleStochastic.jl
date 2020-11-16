@@ -1,10 +1,9 @@
 module BioSimpleStochastic
-    using UUIDs, Distributions, GMC_NS, UnicodePlots
+    using Distributions, GMC_NS, UnicodePlots
     import ProgressMeter: @showprogress,move_cursor_up_while_clearing_lines
     import BioBackgroundModels:lps
     import StatsFuns:logsumexp
     import Serialization:serialize,deserialize
-    import NGRefTools:get_lognormal_params
 
     include("thymidine_sim/thymidine_cell.jl")
     include("thymidine_sim/thymidine_model.jl")
