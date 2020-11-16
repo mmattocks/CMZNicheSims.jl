@@ -4,6 +4,7 @@ module BioSimpleStochastic
     import BioBackgroundModels:lps
     import StatsFuns:logsumexp
     import Serialization:serialize,deserialize
+    import NGRefTools:get_lognormal_params
 
     include("thymidine_sim/thymidine_cell.jl")
     include("thymidine_sim/thymidine_model.jl")

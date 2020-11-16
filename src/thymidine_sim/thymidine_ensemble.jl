@@ -15,7 +15,7 @@ mutable struct Thymidine_Ensemble <: GMC_NS_Ensemble
     obs::Vector{Vector{<:Integer}}
     priors::Vector{<:Distribution}
     constants::Vector{<:Any}
-    #T, pulse, mc_its, end_time, retain_run
+    #T, pulse, mc_its, end_time
     box::Matrix{Float64}
 
     sample_posterior::Bool
@@ -74,7 +74,7 @@ function assemble_TMs(path::String, no_trajectories::Integer, obs, priors, const
 			push!(ensemble_records, Thymidine_Record(trajectory_no, 1, pos,model_path,model.log_Li))
 		else #interrupted assembly pick up from where we left off
 			model = deserialize(model_path)
-			push!(ensemble_records, Thymidine_Record(trajectory_no, 1, pos,model_path,model.log_Li))
+			push!(ensemble_records, Thymidine_Record(trajectory_no, 1, model.pos,model_path,model.log_Li))
 		end
 	end
 
