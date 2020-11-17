@@ -1,4 +1,4 @@
-function thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Integer}})
+function thymidine_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Integer}})
     n_pops=length(pparams); times=length(T)
     popset_labelled=zeros(Int64,mc_its,n_pops,times)
     
@@ -25,9 +25,13 @@ function thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:Abst
         end
     end
 
-    joints=Vector{DiscreteNonParametric}(undef,times)    
-    Threads.@threads for t in 1:times
-        joints[t]=joint_DNP_sum(pop_DNPs[:,t])
+    if n_pops > 1
+        joints=Vector{DiscreteNonParametric}(undef,times)    
+        Threads.@threads for t in 1:times
+            joints[t]=joint_DNP_sum(pop_DNPs[:,t])
+        end
+    else
+        joints=pop_DNPs[1,:]
     end
 
     log_lhs=Vector{Float64}(undef,times)

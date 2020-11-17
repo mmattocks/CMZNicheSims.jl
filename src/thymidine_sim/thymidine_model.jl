@@ -26,13 +26,13 @@ function Thymidine_Model(trajectory, i, θ, pos, v, obs, T, pulse, mc_its, end_t
     n_pops=length(θ)/8
     pparams=Vector{Tuple{LogNormal, LogNormal, Float64, Normal, Float64}}()
     for pop in 1:n_pops
-        pμ, pσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]
-        tcσ=sqrt(tcσ²); sσ=sqrt(sσ²)
+        lpμ, lpσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]
+        lpσ=sqrt(lpσ²); tcσ=sqrt(tcσ²); sσ=sqrt(sσ²)
 
-        push!(pparams,(LogNormal(get_lognormal_params(pμ,pσ²)...),LogNormal(tcμ,tcσ),r,Normal(sμ,sσ),sis_frac))
+        push!(pparams,(LogNormal(lpμ,lpσ),LogNormal(tcμ,tcσ),r,Normal(sμ,sσ),sis_frac))
     end
 
-    log_lh,disp_mat=thymidine_ssm_mc_llh(pparams, mc_its, end_time, pulse, T, obs)
+    log_lh,disp_mat=thymidine_mc_llh(pparams, mc_its, end_time, pulse, T, obs)
     
     v_init && (v=rand(MvNormal(length(θ),1.)))
 
@@ -40,11 +40,3 @@ function Thymidine_Model(trajectory, i, θ, pos, v, obs, T, pulse, mc_its, end_t
 end
 
 thymidine_constructor(params...) = Thymidine_Model(params...)
-
-function get_lognormal_params(desired_μ, desired_σ)
-    μ²=desired_μ^2
-    σ²=desired_σ^2
-    ln_μ=log(μ²/sqrt(μ²+σ²))
-    ln_σ=sqrt(log(1+(σ²/μ²)))
-    return ln_μ, ln_σ
-end

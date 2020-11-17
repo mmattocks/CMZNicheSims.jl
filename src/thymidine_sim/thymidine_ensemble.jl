@@ -39,7 +39,7 @@ end
 Thymidine_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Integer}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
 Thymidine_Ensemble(
     path,
-    Thymidine_Model,
+    thymidine_constructor,
     assemble_TMs(path, no_models, obs, priors, constants, box)...,
     [-Inf], #L0 = 0
 	[0], #ie exp(0) = all of the prior is covered
