@@ -69,7 +69,7 @@ function assemble_TMs(path::String, no_trajectories::Integer, obs, priors, const
             box_bound!(pos,box)
             θvec=to_prior.(pos,priors)
 
-            model = Thymidine_Model(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+            model = thymidine_constructor(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
 
 			serialize(model_path, model) #save the model to the ensemble directory
 			push!(ensemble_records, Thymidine_Record(trajectory_no, 1, pos,model_path,model.log_Li))
