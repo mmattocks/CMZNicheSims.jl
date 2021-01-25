@@ -1,4 +1,4 @@
-module BioSimpleStochastic
+module CMZNicheSims
     using Distributions, GMC_NS, UnicodePlots
     import ProgressMeter: @showprogress,move_cursor_up_while_clearing_lines
     import BioBackgroundModels:lps
@@ -21,6 +21,4 @@ module BioSimpleStochastic
     include("slice_pop_sim/slice_model.jl")
     include("slice_pop_sim/slice_ensemble.jl")
     export Slice_Ensemble
-
-
 end # module

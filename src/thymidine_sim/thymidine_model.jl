@@ -1,4 +1,4 @@
-struct Thymidine_Record <: GMC_NS_Model_Record
+mutable struct Thymidine_Record <: GMC_NS_Model_Record
     trajectory::Int64
     i::Int64
     pos::Vector{Float64}
@@ -6,7 +6,7 @@ struct Thymidine_Record <: GMC_NS_Model_Record
     log_Li::Float64
 end
 
-mutable struct Thymidine_Model <: GMC_NS_Model
+struct Thymidine_Model <: GMC_NS_Model
     trajectory::Int64
     i::Int64
 
@@ -19,7 +19,7 @@ mutable struct Thymidine_Model <: GMC_NS_Model
     disp_mat::Matrix{Float64} #matrix for mean & 95%CI plot of model output
 end
 
-function Thymidine_Model(trajectory, i, θ, pos, v, obs, T, pulse, mc_its, end_time; v_init=false)
+function thymidine_constructor(trajectory, i, θ, pos, v, obs, T, pulse, mc_its, end_time; v_init=false)
     mod(length(θ),8)!=0 && throw(ArgumentError("θ must contain 8 values per lineage population!"))
     pulse<0 && throw(ArgumentError("pulse length must be >=0!"))
 
@@ -38,5 +38,3 @@ function Thymidine_Model(trajectory, i, θ, pos, v, obs, T, pulse, mc_its, end_t
 
     Thymidine_Model(trajectory, i, θ, log_lh, pos, v, disp_mat)
 end
-
-thymidine_constructor(params...) = Thymidine_Model(params...)

@@ -1,5 +1,5 @@
-name = "BioSimpleStochastic"
-uuid = "22a2586e-e24b-4f19-9d5c-8d44cdb215d4"
+name = "CMZNicheSims"
+uuid = "309f5bd8-c2ef-4440-b615-1bfb8393e7f4"
 authors = ["Michael Mattocks <mike.mattocks@utoronto.ca>"]
 version = "0.1.0"
 

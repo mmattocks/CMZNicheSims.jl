@@ -32,6 +32,7 @@ mutable struct CMZ_Ensemble <: GMC_NS_Ensemble
     GMC_timestep_η::Float64
     GMC_reflect_η::Float64
     GMC_exhaust_σ::Float64
+    GMC_chain_κ::Int64
 
     t_counter::Int64
 end
