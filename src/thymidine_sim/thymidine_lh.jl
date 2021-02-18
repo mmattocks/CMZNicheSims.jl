@@ -1,7 +1,8 @@
-function thymidine_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Integer}})
+function thymidine_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:AbstractFloat}, obs::Vector{<:AbstractVector{<:Integer}}, display=false)
     n_pops=length(pparams); times=length(T)
     popset_labelled=zeros(Int64,mc_its,n_pops,times)
-    
+    max_labelled=maximum.(obs)
+
     Threads.@threads for it in 1:mc_its
         for p in 1:n_pops
             pop_dist,tc_dist,r,s,sis_frac = pparams[p]
@@ -9,11 +10,11 @@ function thymidine_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:Abstract
             plv=view(popset_labelled,it,p,:)
 
             for l in 1:Int64(floor(n_lineages/2))
-                sim_lin_pair!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
+                !all(max_labelled .< sum(popset_labelled[it,:,:],dims=1)[1,:]) && sim_lin_pair!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
             end
 
             for l in 1:n_lineages%2
-                sim_lineage!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
+                !all(max_labelled .< sum(popset_labelled[it,:,:],dims=1)[1,:]) && sim_lineage!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
             end
         end
     end
@@ -33,6 +34,8 @@ function thymidine_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:Abstract
     else
         joints=pop_DNPs[1,:]
     end
+
+    display && (return joints)
 
     log_lhs=Vector{Float64}(undef,times)
     Threads.@threads for t in 1:times

@@ -1,48 +1,50 @@
 const DETECTION_THRESHOLD=.01
 
-function sim_lin_pair!(plv, T, end_time, pulse, Tc, r, s, sis_frac)
-    tδ1, s1 = refractory_cycle_model(r, Tc, s)
+function sim_lin_pair!(plv, T, end_time, pulse, Tc, g1, s, sis_frac)
+    tδ1, s1 = cycle_model(g1, Tc, s)
     tδ2, s2 = (1+rand([-1,1])*sis_frac).*(tδ1, s1)
 
-    birth_time=rand(Uniform(-min(tδ1,tδ2),0.))
+    mint=-min(tδ1,tδ2)
+    mint==0. ? (birth_time=mint) : (birth_time=rand(Uniform(mint,0.)))
 
     cells1=[LabelCell(birth_time,tδ1,s1,0.)]
     cells2=[LabelCell(birth_time,tδ2,s2,0.)]
 
     for cellvec in [cells1,cells2]
         ci=1
-        while ci<=length(cellvec)
-            cycle_sim!(plv, ci, cellvec, T, end_time, pulse, Tc,r,s, sis_frac)
+        while ci<=length(cellvec)    
+            cycle_sim!(plv, ci, cellvec, T, end_time, pulse, Tc,g1,s, sis_frac)
             ci+=1
         end
     end    
 end
 
 
-function sim_lineage!(plv, T, end_time, pulse, Tc, r, s, sis_frac)
-    tδ1, s1 = refractory_cycle_model(r, Tc, s)
+function sim_lineage!(plv, T, end_time, pulse, Tc, g1, s, sis_frac)
+    tδ1, s1 = cycle_model(g1, Tc, s)
     birth_time=rand(Uniform(-tδ1,0.))
     cells=[LabelCell(birth_time,tδ1,s1,0.)]
 
     ci=1
     while ci<= length(cells)
-        cycle_sim!(plv, ci, cells, T, end_time, pulse, Tc, r, s, sis_frac)
+        cycle_sim!(plv, ci, cells, T, end_time, pulse, Tc, g1, s, sis_frac)
         ci+=1
     end
 end
 
-function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}, end_time::Float64, pulse::Float64, Tc::LogNormal, r::Float64, sd::Normal, sis_frac::Float64)
+function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}, end_time::Float64, pulse::Float64, Tc::LogNormal, g1::Float64, sd::Normal, sis_frac::Float64)
     n_times=length(T);
 
     cell=cells[ci]
     t=cell.time; tδ′=cell.tδ′; s′=cell.s′; l=cell.label
 
     first_cycle=true
+
     while t<end_time
         tδ,s=0.,0.
-        first_cycle ? (tδ=tδ′;s=s′;first_cycle=false) : ((tδ, s)=refractory_cycle_model(r, Tc, sd))
+        first_cycle ? (tδ=tδ′;s=s′;first_cycle=false) : ((tδ, s)=cycle_model(g1, Tc, sd))
 
-        s_start=t+r
+        s_start=t+g1
         s_end=s_start+s
         cycle_mitosis=t+tδ
         cycle_events=[s_start,s_end,cycle_mitosis]
@@ -69,16 +71,18 @@ function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}
         l/=2 #mitosis halves label for the daughters
 
         tδ2, s2 = (1+rand([-1,1])*sis_frac).*(tδ, s)
+        tδ2 < s_end && (tδ2=s_end) #sister cycle shouldn't be shorter than the end of s phase for sibling- prevents large sis_frac from causing infinitely proliferative loops
 
         cycle_mitosis < end_time && push!(cells,LabelCell(cycle_mitosis,tδ2,s2,l))
         t+=tδ
+        #println("$t $(tδ)")
     end
 end
 
-function refractory_cycle_model(refractory, Tc, s_dist)
+function cycle_model(g1, Tc, s_dist)
     cycle_time=rand(Tc)
     s=max(eps(),rand(s_dist))
-    tδ=max(refractory + s, cycle_time)
+    tδ=max(g1 + s, cycle_time)
     return tδ, s
 end
 

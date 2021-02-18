@@ -102,3 +102,52 @@ function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=f
 
     (progress && return nrows(plt.graphics)+7);
 end
+
+function print_posterior(e::Thymidine_Ensemble, path::String=e.path)
+    MLEmod=deserialize(e.models[findmax([m.log_Li for m in e.models])[2]].path)
+    θ=MLEmod.θ
+    n_pops=length(θ)/8
+    pparams=Vector{Tuple{LogNormal, LogNormal, Float64, Normal, Float64}}()
+    for pop in 1:n_pops
+        lpμ, lpσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]        
+        lpσ=sqrt(lpσ²); tcσ=sqrt(tcσ²); sσ=sqrt(sσ²)
+        push!(pparams,(LogNormal(lpμ,lpσ),LogNormal(tcμ,tcσ),r,Normal(sμ,sσ),sis_frac))
+    end
+
+    T, pulse, mc_its, end_time = e.constants
+
+    joint_DNPs=thymidine_mc_llh(pparams,Int64(1e6),end_time,pulse,T,e.obs,true)
+    
+    max_ct=0
+    for DNP in joint_DNPs
+        max_ct<maximum(DNP.support) && (max_ct=maximum(DNP.support))
+    end
+    cts=LinRange(0,max_ct,max_ct+1)
+    probs=zeros(length(T),length(cts))
+    for (t,DNP) in enumerate(joint_DNPs)
+        for (ct, p) in zip(DNP.support,DNP.p)
+            ct_idx=findfirst(isequal(ct),cts)
+            ct_idx !== nothing && (probs[t,ct_idx]=p)
+        end
+    end
+    catobs=vcat(e.obs...)
+    ymax=Int64(round(maximum(catobs)*1.1))
+    ys=[0,ymax]
+    Ts=vcat([[T[n] for i in 1:length(e.obs[n])] for n in 1:length(T)]...)
+
+    MAPout=Plots.heatmap(T,cts,transpose(probs),ylims=ys)
+    Plots.scatter!(MAPout,Ts,catobs,marker=:cross,markercolor=:green)
+
+    thetas=fill(zeros(0),length(θ))
+
+    for pidx in 1:length(e.posterior_samples)
+        prec=e.posterior_samples[pidx]
+        for t in 1:length(θ)
+            push!(thetas[t],prec.θ[t])
+        end
+    end
+
+    
+
+
+end

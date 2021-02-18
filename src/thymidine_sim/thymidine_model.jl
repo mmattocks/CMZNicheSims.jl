@@ -26,9 +26,8 @@ function thymidine_constructor(trajectory, i, θ, pos, v, obs, T, pulse, mc_its,
     n_pops=length(θ)/8
     pparams=Vector{Tuple{LogNormal, LogNormal, Float64, Normal, Float64}}()
     for pop in 1:n_pops
-        lpμ, lpσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]
+        lpμ, lpσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]        
         lpσ=sqrt(lpσ²); tcσ=sqrt(tcσ²); sσ=sqrt(sσ²)
-
         push!(pparams,(LogNormal(lpμ,lpσ),LogNormal(tcμ,tcσ),r,Normal(sμ,sσ),sis_frac))
     end
 
