@@ -26,5 +26,5 @@ function construct_slice(trajectory::Int64, i::Int64, θ::Vector{Float64}, pos::
 
     v_init && (v=rand(MvNormal(length(θ),1.)))
 
-    Slice_Model(trajectory, i, θ, log_lh, pos, v, disp_mat)
+    return Slice_Model(trajectory, i, θ, log_lh, pos, v, disp_mat)
 end
