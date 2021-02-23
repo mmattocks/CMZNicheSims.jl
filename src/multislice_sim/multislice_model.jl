@@ -26,5 +26,5 @@ function construct_multislice(trajectory::Int64, i::Int64, θ::Vector{Float64}, 
 
     v_init && (v=rand(MvNormal(length(θ),1.)))
 
-    return MultiSlice_Model(slices, trajectory, i, θ, log_lh, pos, v)
+    return MultiSlice_Model(trajectory, i, θ, log_lh, pos, v, slices)
 end
