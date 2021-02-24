@@ -5,16 +5,16 @@ function thymidine_mc_llh(pparams, mc_its, end_time, pulse, T::Vector{<:Abstract
 
     Threads.@threads for it in 1:mc_its
         for p in 1:n_pops
-            pop_dist,tc_dist,r,s,sis_frac = pparams[p]
+            pop_dist,tc_dist,g1_frac,s_frac,sis_frac = pparams[p]
             n_lineages=Int64(max(1,round(rand(pop_dist))))
             plv=view(popset_labelled,it,p,:)
 
             for l in 1:Int64(floor(n_lineages/2))
-                !all(max_labelled .< sum(popset_labelled[it,:,:],dims=1)[1,:]) && sim_lin_pair!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
+                !all(max_labelled .< sum(popset_labelled[it,:,:],dims=1)[1,:]) && sim_lin_pair!(plv, T, end_time, pulse, tc_dist, g1_frac, s_frac, sis_frac)
             end
 
             for l in 1:n_lineages%2
-                !all(max_labelled .< sum(popset_labelled[it,:,:],dims=1)[1,:]) && sim_lineage!(plv, T, end_time, pulse, tc_dist, r, s, sis_frac)
+                !all(max_labelled .< sum(popset_labelled[it,:,:],dims=1)[1,:]) && sim_lineage!(plv, T, end_time, pulse, tc_dist, g1_frac, s_frac, sis_frac)
             end
         end
     end

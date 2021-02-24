@@ -1,48 +1,48 @@
 DETECTION_THRESHOLD=.15
 
-function sim_lin_pair!(plv, T, end_time, pulse, Tc, g1, s, sis_frac)
-    tδ1, s1 = cycle_model(g1, Tc, s)
-    tδ2, s2 = (1+rand([-1,1])*sis_frac).*(tδ1, s1)
+function sim_lin_pair!(plv, T, end_time, pulse, Tc, g1_frac, s_frac, sis_frac)
+    tδ1, g1_1, s1 = cycle_model(Tc, g1_frac, s_frac)
+    tδ2, g1_2, s2 = (1+rand([-1,1])*sis_frac).*(tδ1, g1_1, s1)
 
     mint=-min(tδ1,tδ2)
     mint==0. ? (birth_time=mint) : (birth_time=rand(Uniform(mint,0.)))
 
-    cells1=[LabelCell(birth_time,tδ1,s1,0.)]
-    cells2=[LabelCell(birth_time,tδ2,s2,0.)]
+    cells1=[LabelCell(birth_time,tδ1,g1_1,s1,0.)]
+    cells2=[LabelCell(birth_time,tδ2,g1_2,s2,0.)]
 
     for cellvec in [cells1,cells2]
         ci=1
         while ci<=length(cellvec)    
-            cycle_sim!(plv, ci, cellvec, T, end_time, pulse, Tc,g1,s, sis_frac)
+            cycle_sim!(plv, ci, cellvec, T, end_time, pulse, Tc, g1_frac,s_frac, sis_frac)
             ci+=1
         end
     end    
 end
 
 
-function sim_lineage!(plv, T, end_time, pulse, Tc, g1, s, sis_frac)
-    tδ1, s1 = cycle_model(g1, Tc, s)
+function sim_lineage!(plv, T, end_time, pulse, Tc, g1_frac, s_frac, sis_frac)
+    tδ1, g1, s1 = cycle_model(Tc, g1_frac, s_frac)
     birth_time=rand(Uniform(-tδ1,0.))
-    cells=[LabelCell(birth_time,tδ1,s1,0.)]
+    cells=[LabelCell(birth_time,tδ1,g1,s1,0.)]
 
     ci=1
     while ci<= length(cells)
-        cycle_sim!(plv, ci, cells, T, end_time, pulse, Tc, g1, s, sis_frac)
+        cycle_sim!(plv, ci, cells, T, end_time, pulse, Tc, g1_frac, s_frac, sis_frac)
         ci+=1
     end
 end
 
-function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}, end_time::Float64, pulse::Float64, Tc::LogNormal, g1::Float64, sd::Normal, sis_frac::Float64)
+function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}, end_time::Float64, pulse::Float64, Tc::LogNormal, g1_frac::Float64, s_frac::Float64, sis_frac::Float64)
     n_times=length(T);
 
     cell=cells[ci]
-    t=cell.time; tδ′=cell.tδ′; s′=cell.s′; l=cell.label
+    t=cell.time; tδ′=cell.tδ′; g1′=cell.g1′; s′=cell.s′; l=cell.label
 
     first_cycle=true
 
     while t<end_time
         tδ,s=0.,0.
-        first_cycle ? (tδ=tδ′;s=s′;first_cycle=false) : ((tδ, s)=cycle_model(g1, Tc, sd))
+        first_cycle ? (tδ=tδ′;g1=g1′;s=s′;first_cycle=false) : ((tδ, g1, s)=cycle_model(Tc, g1_frac, s_frac))
 
         s_start=t+g1
         s_end=s_start+s
@@ -70,20 +70,19 @@ function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}
 
         l/=2 #mitosis halves label for the daughters
 
-        tδ2, s2 = (1+rand([-1,1])*sis_frac).*(tδ, s)
-        tδ2 < s_end && (tδ2=s_end) #sister cycle shouldn't be shorter than the end of s phase for sibling- prevents large sis_frac from causing infinitely proliferative loops
+        tδ2, g1_2, s2 = (1+rand([-1,1])*sis_frac).*(tδ, g1, s)
+        tδ2 < 1. && (tδ2, g1_2, s2 = tδ, g1, s) #prevent sister shift from resulting in unrealistically fast proliferation
 
-        cycle_mitosis < end_time && push!(cells,LabelCell(cycle_mitosis,tδ2,s2,l))
+        cycle_mitosis < end_time && push!(cells,LabelCell(cycle_mitosis,tδ2,g1_2,s2,l))
         t+=tδ
-        #println("$t $(tδ)")
     end
 end
 
-function cycle_model(g1, Tc, s_dist)
-    cycle_time=rand(Tc)
-    s=max(eps(),rand(s_dist))
-    tδ=max(g1 + s, cycle_time)
-    return tδ, s
+function cycle_model(Tc, g1_frac, s_frac)
+    tδ=max(1.,rand(Tc)) #floor of 1 hr for any distribution of cycle times
+    s=tδ * s_frac
+    g1=g1_frac * (tδ - s)
+    return tδ, g1, s
 end
 
 function update_label(label, s, s_start, s_end, pulse)
