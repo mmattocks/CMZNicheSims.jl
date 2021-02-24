@@ -1,4 +1,4 @@
-const DETECTION_THRESHOLD=.01
+DETECTION_THRESHOLD=.15
 
 function sim_lin_pair!(plv, T, end_time, pulse, Tc, g1, s, sis_frac)
     tδ1, s1 = cycle_model(g1, Tc, s)
