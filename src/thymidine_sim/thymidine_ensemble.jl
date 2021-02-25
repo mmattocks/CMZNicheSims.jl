@@ -83,7 +83,7 @@ function assemble_TMs(path::String, no_trajectories::Integer, obs, priors, const
 end
 
 function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=false)
-    T=e.constants[1]
+    T=e.constants[2]
 
     catobs=vcat(e.obs...)
     ymax=max(maximum(m.disp_mat),maximum(catobs))
