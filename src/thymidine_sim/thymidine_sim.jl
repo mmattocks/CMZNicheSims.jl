@@ -1,4 +1,5 @@
 DETECTION_THRESHOLD=.15
+MIN_CT=1.
 
 function sim_lin_pair!(plv, T, end_time, pulse, Tc, g1_frac, s_frac, sis_frac)
     tδ1, g1_1, s1 = cycle_model(Tc, g1_frac, s_frac)
@@ -71,7 +72,7 @@ function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}
         l/=2 #mitosis halves label for the daughters
 
         tδ2, g1_2, s2 = (1+rand([-1,1])*sis_frac).*(tδ, g1, s)
-        tδ2 < 1. && (tδ2, g1_2, s2 = tδ, g1, s) #prevent sister shift from resulting in unrealistically fast proliferation
+        tδ2 < MIN_CT && (tδ2=tδ; g1_2=g1; s2 = s;) #prevent sister shift from resulting in unrealistically fast proliferation
 
         cycle_mitosis < end_time && push!(cells,LabelCell(cycle_mitosis,tδ2,g1_2,s2,l))
         t+=tδ
@@ -79,16 +80,16 @@ function cycle_sim!(plv, ci::Int64, cells::Vector{LabelCell}, T::Vector{Float64}
 end
 
 function cycle_model(Tc, g1_frac, s_frac)
-    tδ=max(1.,rand(Tc)) #floor of 1 hr for any distribution of cycle times
+    tδ=max(MIN_CT,rand(Tc)) #floor of 1 hr for any distribution of cycle times
     s=tδ * s_frac
     g1=g1_frac * (tδ - s)
     return tδ, g1, s
 end
 
 function update_label(label, s, s_start, s_end, pulse)
-        s_overlap=min(pulse,s_start+s_end)-max(0,s_start)
-        nuc_label_frac=s_overlap/s
-        return min(nuc_label_frac+label,1.) #label before mitosis time will be what's been accumulated from past + this cycle's s phase
+    s_overlap=min(pulse,s_start+s_end)-max(0,s_start)
+    nuc_label_frac=s_overlap/s
+    return min(nuc_label_frac+label,1.) #label before mitosis time will be what's been accumulated from past + this cycle's s phase
 end
 
 function count_labelled_at_T!(n, cubuf, timept, cycle_events, label_outcomes, oldl, s_start, s, pulse)

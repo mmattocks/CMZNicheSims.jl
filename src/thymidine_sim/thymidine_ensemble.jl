@@ -50,7 +50,7 @@ Thymidine_Ensemble(
 	[0], #H0 = 0,
     obs,
     priors,
-    constants, #T, pulse, mc_its, end_time
+    constants, #popdist, T, pulse, mc_its, end_time
     box,
     sample_posterior,
     Vector{Thymidine_Record}(),
