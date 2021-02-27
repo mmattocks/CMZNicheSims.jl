@@ -103,20 +103,25 @@ function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=f
     (progress && return nrows(plt.graphics)+7);
 end
 
-function print_posterior(e::Thymidine_Ensemble, path::String=e.path)
+function print_MAP_output(e::Thymidine_Ensemble, path::String=e.path)
     MLEmod=deserialize(e.models[findmax([m.log_Li for m in e.models])[2]].path)
     θ=MLEmod.θ
-    n_pops=length(θ)/8
-    pparams=Vector{Tuple{LogNormal, LogNormal, Float64, Normal, Float64}}()
+
+    n_pops=1
+    lt>5 && (n_pops+=(lt-5)/6)
+
+    pparams=Vector{Tuple{LogNormal, Float64, Float64, Float64}}()
     for pop in 1:n_pops
-        lpμ, lpσ², r, tcμ, tcσ², sμ, sσ², sis_frac= θ[Int64(1+((pop-1)*8)):Int64(8*pop)]        
-        lpσ=sqrt(lpσ²); tcσ=sqrt(tcσ²); sσ=sqrt(sσ²)
-        push!(pparams,(LogNormal(lpμ,lpσ),LogNormal(tcμ,tcσ),r,Normal(sμ,sσ),sis_frac))
+        tcμ, tcσ², g1_frac, s_frac, sis_frac= θ[Int64(1+((pop-1)*5)):Int64(5*pop)]        
+        tcσ=sqrt(tcσ²);
+        push!(pparams,(LogNormal(tcμ,tcσ),g1_frac,s_frac,sis_frac))
     end
 
-    T, pulse, mc_its, end_time = e.constants
+    n_pops > 1 ? (pop_fracs=θ[Int64(5*n_pops)+(pop-1):end]) : (    pop_fracs=[])
 
-    joint_DNPs=thymidine_mc_llh(pparams,Int64(1e6),end_time,pulse,T,e.obs,true)
+    popdist, T, pulse, mc_its, end_time = e.constants
+
+    joint_DNPs=thymidine_mc_llh(popdist, pop_fracs, pparams, Int(1e6), end_time, pulse, T, obs)
     
     max_ct=0
     for DNP in joint_DNPs
@@ -138,16 +143,52 @@ function print_posterior(e::Thymidine_Ensemble, path::String=e.path)
     MAPout=Plots.heatmap(T,cts,transpose(probs),ylims=ys)
     Plots.scatter!(MAPout,Ts,catobs,marker=:cross,markercolor=:green)
 
-    thetas=fill(zeros(0),length(θ))
+    savefig(MAPout, path)
+end
 
-    for pidx in 1:length(e.posterior_samples)
-        prec=e.posterior_samples[pidx]
-        for t in 1:length(θ)
-            push!(thetas[t],prec.θ[t])
+function print_marginals(e::Thymidine_Ensemble, path::String;  param_names=["LogNormal Tc μ", "LogNormal Tc σ²", "G1 Fraction", "S Fraction", "Sister Shift Fraction"])
+    wtvec=zeros(0)
+    lt=length(e.priors)
+    θvecs=[zeros(0) for param in 1:lt]
+    for (n,rec) in enumerate(e.posterior_samples)
+        m=deserialize(rec.path)
+        for i in 1:length(θvecs)
+            push!(θvecs[i],m.θ[i])
         end
+        push!(wtvec,e.log_Liwi[n+1])
     end
 
-    
+    for rec in e.models
+        m=deserialize(rec.path)
+        for i in 1:length(θvecs)
+            push!(θvecs[i],m.θ[i])
+        end
+        push!(wtvec,(lps(m.log_Li,lps(e.log_Xi[end],-log(length(e.models))))))
+    end
+
+    n_pops=1
+    lt>5 && (n_pops+=(lt-5)/6)
+    n_pops>1 ? (plotrows=6; og_pn=copy(param_names)) : (plotrows=5)
 
 
+    for pop in 2:n_pops
+        vcat(param_names,vcat(og_pn,"Population $pop Fraction"))
+    end
+
+    plots=Vector{Plots.Plot}()
+    for (n,θvec) in enumerate(θvecs)
+        p_label=param_names[n]
+        occursin("Fraction",p_label) ? (xls=[0,1]) : (xls=[quantile(e.priors[n],.01),quantile(e.priors[n],.99)])
+
+
+        θkde=kde(θvec,weights=exp.(wtvec))
+        plt=plot(e.priors[n], color=:darkmagenta, fill=true, fillalpha=.5, label="Prior", xlabel=p_label, ylabel="Probability density", xlims=xls)
+        plot!(θkde.x,θkde.density, color=:green, fill=true, fillalpha=.75, label="Posterior")
+        push!(plots,plt)
+        n_pops>1 && n==5 && push!(plots,plot())
+    end
+
+    combined=plot(plots..., layout=grid(plotrows,n_pops),size=(600*n_pops,1500))
+
+    savefig(combined, path)
 end
