@@ -1,5 +1,3 @@
-const MAXVAL=prevfloat(Inf)
-
 function CMZ_mc_llh(popdist::Distribution, voldist::Distribution, volconst::Float64, phase_ends::Vector{Float64}, pparams::Vector{Float64}, mc_its::Int64, T::Vector{<:AbstractFloat}, obs::Vector{<:Tuple{<:AbstractVector{<:Float64},<:AbstractVector{<:Float64}}})
     times=length(T)
     pends=floor.(phase_ends)

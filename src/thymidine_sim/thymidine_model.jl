@@ -35,7 +35,7 @@ function thymidine_constructor(trajectory, i, θ, pos, v, obs, popdist, T, pulse
         push!(pparams,(LogNormal(tcμ,tcσ),g1_frac,s_frac,sis_frac))
     end
 
-    n_pops > 1 ? (pop_fracs=θ[Int64(5*n_pops)+(pop-1):end]) : (    pop_fracs=[])
+    n_pops > 1 ? (pop_fracs=θ[Int64(5*n_pops)+1:end]) : (pop_fracs=[])
 
     log_lh,disp_mat=thymidine_mc_llh(popdist, pop_fracs, pparams, mc_its, end_time, pulse, T, obs)
     

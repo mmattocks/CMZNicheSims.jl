@@ -1,5 +1,3 @@
-const MAXVAL=prevfloat(Inf)
-
 function slice_mc_llh(popdist::Distribution, lm::Lens_Model, phase_ends::Vector{Float64}, pparams::Vector{Float64}, mc_its::Int64, T::Vector{Float64}, obs::Vector{Vector{Float64}})
     times=length(T)
     pends=floor.(phase_ends)
@@ -13,14 +11,13 @@ function slice_mc_llh(popdist::Distribution, lm::Lens_Model, phase_ends::Vector{
         phase=1
         cycle_time,exit_rate=pparams[1+((phase-1)*2):2+((phase-1)*2)]
 
-        results[idxs,1,1].=rand.(popdist)
+        results[idxs,1].=rand.(popdist)
 
         next_event=2;
         while next_event<=length(events)
             n=events[next_event]-events[next_event-1]
 
             pop_factor=max(eps(),(2^(24/cycle_time)-exit_rate))
-            pop_factor==1. && (pop_factor=pop_factor+eps())
 
             lastpops=view(results,idxs,next_event-1)
 

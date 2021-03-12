@@ -43,10 +43,10 @@ Slice_Ensemble(
     construct_slice,
     assemble_SMs(path, no_models, obs, priors, constants, box)...,
     [-Inf], #L0 = 0
-	[0], #ie exp(0) = all of the prior is covered
+	[0], #X0 = 1
 	[-Inf], #w0 = 0
 	[-Inf], #Liwi0 = 0
-	[-1e300], #Z0 = 0
+	[-Inf], #Z0 = 0
 	[0], #H0 = 0,
     obs,
     priors,
@@ -104,5 +104,5 @@ function Base.show(io::IO, m::Slice_Model, e::Slice_Ensemble; progress=false)
     println("θ: $(m.θ)")
     println("v: $(m.v)")
 
-    (progress && return nrows(plt.graphics)+16);
+    (progress && return nrows(plt.graphics)+17);
 end

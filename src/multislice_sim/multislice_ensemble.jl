@@ -44,10 +44,10 @@ MultiSlice_Ensemble(
     construct_multislice,
     assemble_MSMs(path, no_models, obs, priors, constants, box)...,
     [-Inf], #L0 = 0
-	[0], #ie exp(0) = all of the prior is covered
+	[0], #X0 = 1
 	[-Inf], #w0 = 0
 	[-Inf], #Liwi0 = 0
-	[-1e300], #Z0 = 0
+	[-Inf], #Z0 = 0
 	[0], #H0 = 0,
     obs,
     priors,
@@ -57,6 +57,26 @@ MultiSlice_Ensemble(
     Vector{Slice_Record}(),
     GMC_settings...,
     no_models+1)
+
+MultiSlice_Decay_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
+MultiSlice_Ensemble(
+        path,
+        construct_decay_multislice,
+        assemble_MSDMs(path, no_models, obs, priors, constants, box)...,
+        [-Inf], #L0 = 0
+        [0], #X0 = 1
+        [-Inf], #w0 = 0
+        [-Inf], #Liwi0 = 0
+        [-Inf], #Z0 = 0
+        [0], #H0 = 0,
+        obs,
+        priors,
+        constants, #T, popdist, lens_model, mc_its
+        box,
+        sample_posterior,
+        Vector{Slice_Record}(),
+        GMC_settings...,
+        no_models+1)
 
 function assemble_MSMs(path::String, no_trajectories::Integer, obs, priors, constants, box)
     ensemble_records = Vector{Slice_Record}()
@@ -85,12 +105,36 @@ function assemble_MSMs(path::String, no_trajectories::Integer, obs, priors, cons
     return ensemble_records, minimum([record.log_Li for record in ensemble_records])
 end
 
+function assemble_MSDMs(path::String, no_trajectories::Integer, obs, priors, constants, box)
+    ensemble_records = Vector{Slice_Record}()
+    !isdir(path) && mkpath(path)
+    @showprogress 1 "Assembling Slice_Model ensemble..." for trajectory_no in 1:no_trajectories
+        model_path = string(path,'/',trajectory_no,'.',1)
+        if !isfile(model_path)
+            proposal=rand.(priors)
+            pos=to_unit_ball.(proposal,priors)
+            box_bound!(pos,box)
+            θvec=to_prior.(pos,priors)
+            
+            model = construct_decay_multislice(trajectory_no, 1, θvec, pos, [0.], obs, constants...; v_init=true)
+    
+            serialize(model_path, model) #save the model to the ensemble directory
+            push!(ensemble_records, Slice_Record(trajectory_no, 1, pos,model_path,model.log_Li))
+        else #interrupted assembly pick up from where we left off
+            model = deserialize(model_path)
+            push!(ensemble_records, Slice_Record(trajectory_no, 1, model.pos,model_path,model.log_Li))
+        end
+    end
+
+    return ensemble_records, minimum([record.log_Li for record in ensemble_records])
+end
 
 function Base.show(io::IO, m::MultiSlice_Model, e::MultiSlice_Ensemble; progress=false)
     T=e.constants[1]
 
     println("MultiSlice_Model $(m.trajectory).$(m.i)")
 
+    rows=0
     for (n,(obs, slice)) in enumerate(zip(e.obs,m.slices))
         catpobs=vcat([obs[t] for t in 1:length(T)]...)
         ymax=max(maximum(slice.disp_mat[:,:]),maximum(catpobs))
@@ -103,6 +147,7 @@ function Base.show(io::IO, m::MultiSlice_Model, e::MultiSlice_Ensemble; progress
         Ts=vcat([[T[n] for i in 1:length(obs[n])] for n in 1:length(T)]...)
         scatterplot!(plt,Ts, catpobs, color=:yellow, name="Obs")
 
+        rows+=nrows(plt.graphics)
         show(io, plt)
         println()
     end
@@ -112,5 +157,5 @@ function Base.show(io::IO, m::MultiSlice_Model, e::MultiSlice_Ensemble; progress
     println("θ: $(m.θ)")
     println("v: $(m.v)")
 
-    progress ? (return nrows(plt.graphics)+13*length(m.slices)+5) : (return)
+    progress ? (return rows+14) : (return)
 end

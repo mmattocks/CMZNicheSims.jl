@@ -41,8 +41,6 @@ function thymidine_mc_llh(pop_dist, pop_fracs, pparams, mc_its, end_time, pulse,
         joints=pop_DNPs[1,:]
     end
 
-    display && (return joints)
-
     log_lhs=Vector{Float64}(undef,times)
     Threads.@threads for t in 1:times
         log_lhs[t]=lps(logpdf(joints[t],obs[t]))
@@ -54,7 +52,7 @@ function thymidine_mc_llh(pop_dist, pop_fracs, pparams, mc_its, end_time, pulse,
     Threads.@threads for t in 1:times
         disp_mat[t,:]=[quantile(joints[t],.025),mean(joints[t]),quantile(joints[t],.975)]
     end
-    return log_lh, disp_mat
+    display ? (return log_lh, disp_mat, joints) : (return log_lh, disp_mat)
 end
 
 function joint_DNP_sum(cs)

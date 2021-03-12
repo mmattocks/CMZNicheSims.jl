@@ -43,10 +43,10 @@ Thymidine_Ensemble(
     thymidine_constructor,
     assemble_TMs(path, no_models, obs, priors, constants, box)...,
     [-Inf], #L0 = 0
-	[0], #ie exp(0) = all of the prior is covered
+	[0], #X0 = 1
 	[-Inf], #w0 = 0
 	[-Inf], #Liwi0 = 0
-	[-1e300], #Z0 = 0
+	[-Inf], #Z0 = 0
 	[0], #H0 = 0,
     obs,
     priors,
@@ -100,12 +100,13 @@ function Base.show(io::IO, m::Thymidine_Model, e::Thymidine_Ensemble; progress=f
     println()
     println("θ: $(m.θ)")
 
-    (progress && return nrows(plt.graphics)+7);
+    (progress && return nrows(plt.graphics)+8);
 end
 
-function print_MAP_output(e::Thymidine_Ensemble, path::String=e.path)
+function print_MAP_output(e::Thymidine_Ensemble, path::String=e.path; its::Int64=Int64(1e6), size=(900,600), clims=(0.,.05))
     MLEmod=deserialize(e.models[findmax([m.log_Li for m in e.models])[2]].path)
     θ=MLEmod.θ
+    lt=length(e.priors)
 
     n_pops=1
     lt>5 && (n_pops+=(lt-5)/6)
@@ -117,11 +118,11 @@ function print_MAP_output(e::Thymidine_Ensemble, path::String=e.path)
         push!(pparams,(LogNormal(tcμ,tcσ),g1_frac,s_frac,sis_frac))
     end
 
-    n_pops > 1 ? (pop_fracs=θ[Int64(5*n_pops)+(pop-1):end]) : (    pop_fracs=[])
+    n_pops > 1 ? (pop_fracs=θ[Int64(5*n_pops)+1:end]) : (pop_fracs=[])
 
     popdist, T, pulse, mc_its, end_time = e.constants
 
-    joint_DNPs=thymidine_mc_llh(popdist, pop_fracs, pparams, Int(1e6), end_time, pulse, T, obs)
+    log_lh, disp_mat, joint_DNPs=thymidine_mc_llh(popdist, pop_fracs, pparams, its, end_time, pulse, T, e.obs, true)
     
     max_ct=0
     for DNP in joint_DNPs
@@ -140,8 +141,11 @@ function print_MAP_output(e::Thymidine_Ensemble, path::String=e.path)
     ys=[0,ymax]
     Ts=vcat([[T[n] for i in 1:length(e.obs[n])] for n in 1:length(T)]...)
 
-    MAPout=Plots.heatmap(T,cts,transpose(probs),ylims=ys)
-    Plots.scatter!(MAPout,Ts,catobs,marker=:cross,markercolor=:green)
+    MAPout=Plots.heatmap(T,cts,transpose(probs),ylims=ys,color=:viridis,size=size,clims=clims, xlabel="Post-pulse chase time (hr)", ylabel="Labelled cells (#)", colorbar_title="Probability mass", legend=:topleft, foreground_color_legend=nothing, background_color_legend=nothing, legendfontcolor=:white)
+    Plots.scatter!(MAPout,Ts,catobs,marker=:cross,markercolor=:magenta, label="Observations")
+    Plots.plot!(MAPout, T, disp_mat[:,2], color=:white, width=2, label="Simulated count mean")
+    Plots.plot!(MAPout, T, disp_mat[:,1], color=:white, style=:dash, label="Simulated count 95% probability mass")
+    Plots.plot!(MAPout, T, disp_mat[:,3], color=:white, style=:dash, label=:none)
 
     savefig(MAPout, path)
 end
@@ -167,13 +171,14 @@ function print_marginals(e::Thymidine_Ensemble, path::String;  param_names=["Log
     end
 
     n_pops=1
-    lt>5 && (n_pops+=(lt-5)/6)
+    lt>5 && (n_pops+=Int64((lt-5)/6))
     n_pops>1 ? (plotrows=6; og_pn=copy(param_names)) : (plotrows=5)
 
-
     for pop in 2:n_pops
-        vcat(param_names,vcat(og_pn,"Population $pop Fraction"))
+        param_names=vcat(param_names,vcat(og_pn,"Population $pop Fraction"))
     end
+    
+    mapm=deserialize(e.models[findmax([m.log_Li for m in e.models])[2]].path)
 
     plots=Vector{Plots.Plot}()
     for (n,θvec) in enumerate(θvecs)
@@ -182,13 +187,15 @@ function print_marginals(e::Thymidine_Ensemble, path::String;  param_names=["Log
 
 
         θkde=kde(θvec,weights=exp.(wtvec))
-        plt=plot(e.priors[n], color=:darkmagenta, fill=true, fillalpha=.5, label="Prior", xlabel=p_label, ylabel="Probability density", xlims=xls)
+        n==1 ? (lblpos=:right) : (lblpos=:none)
+        plt=StatsPlots.plot(e.priors[n], color=:darkmagenta, fill=true, fillalpha=.5, label="Prior", xlabel=p_label, ylabel="Density", xlims=xls)
         plot!(θkde.x,θkde.density, color=:green, fill=true, fillalpha=.75, label="Posterior")
+        plot!([mapm.θ[n],mapm.θ[n]],[0,maximum(θkde.density)],color=:black, label="MAP", legend=lblpos)
         push!(plots,plt)
         n_pops>1 && n==5 && push!(plots,plot())
     end
 
-    combined=plot(plots..., layout=grid(plotrows,n_pops),size=(600*n_pops,1500))
+    combined=plot(plots..., layout=grid(plotrows,n_pops),size=(600*n_pops,800))
 
     savefig(combined, path)
 end
