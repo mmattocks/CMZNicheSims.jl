@@ -119,5 +119,5 @@ function Base.show(io::IO, m::CMZ_Model, e::CMZ_Ensemble; progress=false)
     println("θ: $(m.θ)")
     println("v: $(m.v)")
 
-    (progress && return nrows(plt.graphics)+27);
+    (progress && return nrows(plt.graphics)+26);
 end

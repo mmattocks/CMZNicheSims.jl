@@ -104,5 +104,5 @@ function Base.show(io::IO, m::Slice_Model, e::Slice_Ensemble; progress=false)
     println("θ: $(m.θ)")
     println("v: $(m.v)")
 
-    (progress && return nrows(plt.graphics)+17);
+    (progress && return nrows(plt.graphics)+16);
 end
