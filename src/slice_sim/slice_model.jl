@@ -1,4 +1,4 @@
-mutable struct Slice_Record <: GMC_NS_Model_Record
+struct Slice_Record <: GMC_NS_Model_Record
     trajectory::Int64
     i::Int64
     pos::Vector{Float64}
