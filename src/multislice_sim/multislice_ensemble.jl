@@ -38,7 +38,7 @@ mutable struct MultiSlice_Ensemble <: GMC_NS_Ensemble
     t_counter::Int64
 end
 
-MultiSlice_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
+MultiSlice_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GS_settings; sample_posterior::Bool=true) =
 MultiSlice_Ensemble(
     path,
     construct_multislice,
@@ -55,10 +55,10 @@ MultiSlice_Ensemble(
     box,
     sample_posterior,
     Vector{Slice_Record}(),
-    GMC_settings...,
+    GS_settings...,
     no_models+1)
 
-MultiSlice_Decay_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
+MultiSlice_Decay_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GS_settings; sample_posterior::Bool=true) =
 MultiSlice_Ensemble(
         path,
         construct_decay_multislice,
@@ -75,7 +75,7 @@ MultiSlice_Ensemble(
         box,
         sample_posterior,
         Vector{Slice_Record}(),
-        GMC_settings...,
+        GS_settings...,
         no_models+1)
 
 function assemble_MSMs(path::String, no_trajectories::Integer, obs, priors, constants, box)

@@ -37,7 +37,7 @@ mutable struct CMZ_Ensemble <: GMC_NS_Ensemble
     t_counter::Int64
 end
 
-CMZ_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:Tuple{<:AbstractVector{<:Float64},<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
+CMZ_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:Tuple{<:AbstractVector{<:Float64},<:AbstractVector{<:Float64}}}, priors::AbstractVector{<:Distribution}, constants, box, GS_settings; sample_posterior::Bool=true) =
 CMZ_Ensemble(
     path,
     construct_CMZ,
@@ -54,7 +54,7 @@ CMZ_Ensemble(
     box,
     sample_posterior,
     Vector{CMZ_Record}(),
-    GMC_settings...,
+    GS_settings...,
     no_models+1)
 
 function assemble_CMs(path::String, no_trajectories::Integer, obs, priors, constants, box)

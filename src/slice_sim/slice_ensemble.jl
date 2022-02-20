@@ -37,7 +37,7 @@ mutable struct Slice_Ensemble <: GMC_NS_Ensemble
     t_counter::Int64
 end
 
-Slice_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Float64}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
+Slice_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Float64}}, priors::AbstractVector{<:Distribution}, constants, box, GS_settings; sample_posterior::Bool=true) =
 Slice_Ensemble(
     path,
     construct_slice,
@@ -54,7 +54,7 @@ Slice_Ensemble(
     box,
     sample_posterior,
     Vector{Slice_Record}(),
-    GMC_settings...,
+    GS_settings...,
     no_models+1)
 
 function assemble_SMs(path::String, no_trajectories::Integer, obs, priors, constants, box)

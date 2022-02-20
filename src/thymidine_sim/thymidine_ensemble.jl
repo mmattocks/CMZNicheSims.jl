@@ -37,7 +37,7 @@ mutable struct Thymidine_Ensemble <: GMC_NS_Ensemble
     t_counter::Int64
 end
 
-Thymidine_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Integer}}, priors::AbstractVector{<:Distribution}, constants, box, GMC_settings; sample_posterior::Bool=true) =
+Thymidine_Ensemble(path::String, no_models::Integer, obs::AbstractVector{<:AbstractVector{<:Integer}}, priors::AbstractVector{<:Distribution}, constants, box, GS_settings; sample_posterior::Bool=true) =
 Thymidine_Ensemble(
     path,
     thymidine_constructor,
@@ -54,7 +54,7 @@ Thymidine_Ensemble(
     box,
     sample_posterior,
     Vector{Thymidine_Record}(),
-    GMC_settings...,
+    GS_settings...,
 	no_models+1)
 
 function assemble_TMs(path::String, no_trajectories::Integer, obs, priors, constants, box)
@@ -141,7 +141,7 @@ function print_MAP_output(e::Thymidine_Ensemble, path::String=e.path; its::Int64
     ys=[0,ymax]
     Ts=vcat([[T[n] for i in 1:length(e.obs[n])] for n in 1:length(T)]...)
 
-    MAPout=Plots.heatmap(T,cts,transpose(probs),ylims=ys,color=:viridis,size=size,clims=clims, xlabel="Post-pulse chase time (hr)", ylabel="Labelled cells (#)", colorbar_title="Probability mass", legend=:topleft, foreground_color_legend=nothing, background_color_legend=nothing, legendfontcolor=:white)
+    MAPout=Plots.heatmap(T,cts,transpose(probs),ylims=ys,color=:viridis,size=size,clims=clims, xlabel="Post-pulse chase time (hr)", ylabel="Labelled cells (#)", colorbar_title="Probability mass", legend=:topleft, foreground_color_legend=nothing, background_color_legend=nothing, legendfontcolor=:white, xticks=T)
     Plots.scatter!(MAPout,Ts,catobs,marker=:cross,markercolor=:magenta, label="Observations")
     Plots.plot!(MAPout, T, disp_mat[:,2], color=:white, width=2, label="Simulated count mean")
     Plots.plot!(MAPout, T, disp_mat[:,1], color=:white, style=:dash, label="Simulated count 95% probability mass")
